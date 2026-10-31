@@ -3,9 +3,12 @@
 <?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.effect.DropShadow?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
@@ -19,13 +22,16 @@
     <children>
         <Canvas fx:id="canvas" width="560.0" height="668.0"/>
 
+        <!-- MAIN GAME MENU -->
         <VBox fx:id="menu" alignment="CENTER" spacing="16.0"
               AnchorPane.topAnchor="0.0" AnchorPane.bottomAnchor="0.0"
               AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0"
-              style="-fx-background-color: rgba(0,0,0,0.84);">
+              style="-fx-background-color: rgba(0,0,0,0.88);"
+              visible="false" managed="false">
             <children>
                 <Label text="PAC-MAN" textFill="#FFE100">
                     <font><Font name="Monospaced" size="46.0"/></font>
+                    <effect><DropShadow color="#FFE100" radius="15.0" spread="0.4"/></effect>
                 </Label>
 
                 <Label fx:id="statusLabel" text="" textFill="#8AE234">
@@ -49,7 +55,7 @@
                              style="-fx-font-family: Monospaced; -fx-font-size: 14px;"/>
 
                 <Button fx:id="startButton" text="START" onAction="#onStart"
-                        style="-fx-font-family: Monospaced; -fx-font-size: 16px; -fx-font-weight: bold;"/>
+                        style="-fx-font-family: Monospaced; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-color: #FFE100; -fx-text-fill: black; -fx-cursor: hand;"/>
 
                 <Label text="ARROWS / WASD  MOVE     P  PAUSE     M  SOUND     G  GRAPH"
                        textFill="#AAAAAA">
@@ -58,6 +64,45 @@
 
                 <Label text="secret codes:  speedup   freeze   godmode" textFill="#666666">
                     <font><Font name="Monospaced" size="11.0"/></font>
+                </Label>
+            </children>
+        </VBox>
+
+        <!-- HIGH-END ARCADE INTRO & LOADING OVERLAY WITH BACKGROUND IMAGE -->
+        <VBox fx:id="introOverlay" alignment="CENTER" spacing="22.0"
+              AnchorPane.topAnchor="0.0" AnchorPane.bottomAnchor="0.0"
+              AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0"
+              style="-fx-background-image: url('/com/pacman/arcade_bg.jpg');
+                     -fx-background-size: cover;
+                     -fx-background-position: center;
+                     -fx-background-color: rgba(0, 0, 0, 0.78);">
+            <children>
+                <Label fx:id="arcadeHeaderLabel" text="WELCOME TO PAC-MAN!" textFill="#FFE100">
+                    <font><Font name="Monospaced" size="32.0"/></font>
+                    <effect><DropShadow color="#FFB800" radius="20.0" spread="0.6"/></effect>
+                </Label>
+
+                <!-- Fixed Ghost Character Lineup -->
+                <HBox fx:id="characterBox" alignment="CENTER" spacing="18.0" opacity="0.0"
+                      style="-fx-padding: 10px; -fx-background-color: rgba(20,20,40,0.75); -fx-background-radius: 8px;">
+                    <children>
+                        <Label text="ᗧ" textFill="#FFE100"><font><Font name="Monospaced" size="30.0"/></font></Label>
+                        <Label text="BLINKY" textFill="#FF2D2D"><font><Font name="Monospaced" size="14.0"/></font></Label>
+                        <Label text="PINKY" textFill="#FFB8FF"><font><Font name="Monospaced" size="14.0"/></font></Label>
+                        <Label text="INKY" textFill="#00E5FF"><font><Font name="Monospaced" size="14.0"/></font></Label>
+                        <Label text="CLYDE" textFill="#FFB852"><font><Font name="Monospaced" size="14.0"/></font></Label>
+                    </children>
+                </HBox>
+
+                <Label fx:id="loadingTextLabel" text="INITIALIZING RETRO ARCADE CABINET..." textFill="#8AE234">
+                    <font><Font name="Monospaced" size="13.0"/></font>
+                </Label>
+
+                <ProgressBar fx:id="loadingProgressBar" progress="0.0" prefWidth="340.0" prefHeight="14.0"
+                             style="-fx-accent: #FFE100; -fx-control-inner-background: #1a1a1a;"/>
+
+                <Label fx:id="percentageLabel" text="0%" textFill="#FFE100">
+                    <font><Font name="Monospaced" size="15.0"/></font>
                 </Label>
             </children>
         </VBox>
