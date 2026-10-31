@@ -10,20 +10,26 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.RadioButton;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 /**
  * Controller backing {@code pacman.fxml}.
- * Manages the Classic Arcade Intro sequence before displaying the main game menu.
+ * Manages the Classic Arcade Intro sequence, scaling, and game actions.
  */
 public class GameController {
 
+    @FXML private StackPane rootPane;
+    @FXML private AnchorPane gameContainer;
     @FXML private Canvas canvas;
     @FXML private VBox menu;
     @FXML private VBox introOverlay;
-    @FXML private HBox characterBox; // Fixed: matched to HBox in FXML
+    @FXML private HBox characterBox;
     @FXML private Label arcadeHeaderLabel;
     @FXML private Label loadingTextLabel;
     @FXML private Label percentageLabel;
@@ -49,16 +55,18 @@ public class GameController {
         canvas.setHeight(Renderer.CANVAS_H);
         gc = canvas.getGraphicsContext2D();
 
-        // Ensure game menu is hidden initially while intro plays
         menu.setVisible(false);
         menu.setManaged(false);
     }
 
     public void attach(Scene scene) {
+        // Bind scaling and centering dynamically to window size changes (Fullscreen/Maximize)
+        scene.widthProperty().addListener((obs, oldVal, newVal) -> updateScaling(scene));
+        scene.heightProperty().addListener((obs, oldVal, newVal) -> updateScaling(scene));
+
         scene.setOnKeyPressed(e -> {
-            // Block game inputs until intro finishes and game is running
             if (!running && introOverlay.isVisible()) {
-                return; // No skipping allowed as requested!
+                return; // No skipping allowed during intro
             }
             if (!running) {
                 if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
@@ -74,12 +82,25 @@ public class GameController {
         });
     }
 
-    /** Triggers the Classic Arcade Intro animation sequence upon launch. */
+    private void updateScaling(Scene scene) {
+        double windowW = scene.getWidth();
+        double windowH = scene.getHeight();
+        double baseW = Renderer.CANVAS_W;
+        double baseH = Renderer.CANVAS_H;
+
+        // Calculate scale factor to fit window while preserving aspect ratio
+        double scaleX = windowW / baseW;
+        double scaleY = windowH / baseH;
+        double scale = Math.min(scaleX, scaleY);
+
+        gameContainer.setScaleX(scale);
+        gameContainer.setScaleY(scale);
+    }
+
     public void playIntroSequence() {
         audioManager.playWelcomeVoice();
         audioManager.startIntroMusic();
 
-        // Stage 1 & 2: Logo Zoom & Character Fade-in
         ScaleTransition logoZoom = new ScaleTransition(Duration.seconds(2.0), arcadeHeaderLabel);
         logoZoom.setFromX(0.2);
         logoZoom.setFromY(0.2);
@@ -96,13 +117,11 @@ public class GameController {
 
         ParallelTransition introGroup = new ParallelTransition(logoZoom, logoFade, charFade);
 
-        // Stage 3 & 4: Loading Progress Bar Animation (0% to 100% over 5 seconds)
         Timeline progressTimeline = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(loadingProgressBar.progressProperty(), 0.0)),
                 new KeyFrame(Duration.seconds(5.0), new KeyValue(loadingProgressBar.progressProperty(), 1.0))
         );
 
-        // Percentage counter updater
         final double[] progressCounter = {0.0};
         Timeline percentageTimeline = new Timeline(
                 new KeyFrame(Duration.millis(50), event -> {
@@ -113,7 +132,6 @@ public class GameController {
         );
         percentageTimeline.setCycleCount(100);
 
-        // Sequential transition wrapping the whole intro
         SequentialTransition fullIntro = new SequentialTransition(
                 introGroup,
                 new ParallelTransition(progressTimeline, percentageTimeline)
@@ -121,7 +139,6 @@ public class GameController {
 
         fullIntro.setOnFinished(event -> {
             audioManager.stopIntroMusic();
-            // Transition to Main Menu
             FadeTransition fadeOutIntro = new FadeTransition(Duration.seconds(1.0), introOverlay);
             fadeOutIntro.setFromValue(1.0);
             fadeOutIntro.setToValue(0.0);
@@ -137,7 +154,6 @@ public class GameController {
     }
 
     public void start() {
-        // Start the background intro sequence first
         playIntroSequence();
 
         AnimationTimer timer = new AnimationTimer() {
@@ -216,6 +232,14 @@ public class GameController {
                 break;
             case G:
                 game.showGraph = !game.showGraph;
+                break;
+            case F:
+            case F11:
+                Window window = canvas.getScene().getWindow();
+                if (window instanceof Stage) {
+                    Stage stage = (Stage) window;
+                    stage.setFullScreen(!stage.isFullScreen());
+                }
                 break;
             default:
                 break;
