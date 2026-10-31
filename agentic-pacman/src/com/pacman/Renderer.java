@@ -92,7 +92,6 @@ public class Renderer {
         boolean powerVisible = ((int) (game.time * 4)) % 2 == 0;
         gc.setFill(PELLET);
         if (game.maze.isCompressed()) {
-            // Sparse mode: iterate only the survivors instead of all 868 tiles.
             SparseMatrix s = game.maze.sparse();
             for (int i = 0; i < s.size(); i++) {
                 double cx = s.col(i) * TILE + TILE / 2.0;
@@ -196,6 +195,7 @@ public class Renderer {
         gc.lineTo(x + r, bottom);
         int segs = 3;
         double segW = (2 * r) / segs;
+
         double bump = r * 0.32;
         for (int i = 0; i < segs; i++) {
             double sx = x + r - i * segW;
@@ -254,7 +254,6 @@ public class Renderer {
     // agentic debug overlay
     // ------------------------------------------------------------------
 
-    /** Draws the maze graph, each ghost's planned path and the tracker target. */
     private void drawGraph(GraphicsContext gc, Game game) {
         MazeGraph g = game.graph;
 
@@ -366,29 +365,34 @@ public class Renderer {
         gc.setFill(Color.web("#05050A"));
         gc.fillRect(0, top, CANVAS_W, HUD);
 
+        // Bottom Status Bar Items in a single evenly-spaced line
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
+
+        // Item 1: SCORE (Left aligned)
         gc.setFill(TEXT);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 18));
-
         gc.setTextAlign(TextAlignment.LEFT);
-        gc.fillText("SCORE " + game.score, 12, top + 30);
+        gc.fillText("SCORE " + game.score, 20, top + 30);
 
-        gc.setTextAlign(TextAlignment.RIGHT);
-        gc.fillText("LEVEL " + game.level, CANVAS_W - 12, top + 30);
-
+        // Item 2: SOUND STATUS (Center-Left)
         gc.setTextAlign(TextAlignment.CENTER);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
         gc.setFill(game.sound.isEnabled() ? Color.web("#8AE234") : Color.web("#666666"));
-        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", CANVAS_W / 2, top + 30);
+        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", 170, top + 30);
 
+        // Item 3: LEVEL (Center-Right)
+        gc.setFill(TEXT);
+        gc.fillText("LEVEL " + game.level, 320, top + 30);
+
+        // Item 4: Lives icons placed in the right-side exit position
+        for (int i = 0; i < game.lives; i++) {
+            drawLifeIcon(gc, 435 + (i * 22), top + 20);
+        }
+
+        // Sub-label for ghost mode configuration
         gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 11));
         gc.setFill(game.ghostMode == Game.GhostMode.SOLO
                 ? Color.web("#FF3B3B") : Color.web("#8890BB"));
         gc.fillText(game.ghostMode == Game.GhostMode.SOLO ? "SOLO HUNTER" : "CLASSIC x4",
                 CANVAS_W / 2, top + 44);
-
-        for (int i = 0; i < game.lives; i++) {
-            drawLifeIcon(gc, 14 + i * 26, top + 10);
-        }
     }
 
     private void drawLifeIcon(GraphicsContext gc, double x, double y) {

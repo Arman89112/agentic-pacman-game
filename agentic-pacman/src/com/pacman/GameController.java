@@ -20,7 +20,7 @@ import javafx.util.Duration;
 
 /**
  * Controller backing {@code pacman.fxml}.
- * Manages the Classic Arcade Intro sequence, scaling, and game actions.
+ * Manages the Classic Arcade Intro sequence, scaling, game actions, and exit controls.
  */
 public class GameController {
 
@@ -29,6 +29,7 @@ public class GameController {
     @FXML private Canvas canvas;
     @FXML private VBox menu;
     @FXML private VBox introOverlay;
+    @FXML private VBox exitDialog;
     @FXML private HBox characterBox;
     @FXML private Label arcadeHeaderLabel;
     @FXML private Label loadingTextLabel;
@@ -45,6 +46,7 @@ public class GameController {
     private GraphicsContext gc;
     private long lastNano;
     private boolean running;
+    private boolean wasRunningBeforeExit;
     private final AudioManager audioManager = new AudioManager();
 
     @FXML
@@ -57,10 +59,11 @@ public class GameController {
 
         menu.setVisible(false);
         menu.setManaged(false);
+        exitDialog.setVisible(false);
+        exitDialog.setManaged(false);
     }
 
     public void attach(Scene scene) {
-        // Bind scaling and centering dynamically to window size changes (Fullscreen/Maximize)
         scene.widthProperty().addListener((obs, oldVal, newVal) -> updateScaling(scene));
         scene.heightProperty().addListener((obs, oldVal, newVal) -> updateScaling(scene));
 
@@ -68,12 +71,47 @@ public class GameController {
             if (!running && introOverlay.isVisible()) {
                 return; // No skipping allowed during intro
             }
+            if (exitDialog.isVisible()) {
+                if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.Y) {
+                    onExitYes();
+                } else if (e.getCode() == KeyCode.ESCAPE || e.getCode() == KeyCode.N) {
+                    onExitNo();
+                }
+                return;
+            }
             if (!running) {
                 if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
                     onStart();
                 }
                 return;
             }
+
+            // Fullscreen: F to enter, ESC to exit fullscreen
+            if (e.getCode() == KeyCode.F) {
+                Window window = canvas.getScene().getWindow();
+                if (window instanceof Stage) {
+                    Stage stage = (Stage) window;
+                    stage.setFullScreen(true);
+                }
+                return;
+            }
+            if (e.getCode() == KeyCode.ESCAPE) {
+                Window window = canvas.getScene().getWindow();
+                if (window instanceof Stage) {
+                    Stage stage = (Stage) window;
+                    if (stage.isFullScreen()) {
+                        stage.setFullScreen(false);
+                        return;
+                    }
+                }
+            }
+
+            // Backspace triggers exit prompt
+            if (e.getCode() == KeyCode.BACK_SPACE) {
+                triggerExitPrompt();
+                return;
+            }
+
             onKeyPressed(e.getCode());
             String text = e.getText();
             if (text != null && text.length() == 1) {
@@ -88,7 +126,6 @@ public class GameController {
         double baseW = Renderer.CANVAS_W;
         double baseH = Renderer.CANVAS_H;
 
-        // Calculate scale factor to fit window while preserving aspect ratio
         double scaleX = windowW / baseW;
         double scaleY = windowH / baseH;
         double scale = Math.min(scaleX, scaleY);
@@ -189,6 +226,7 @@ public class GameController {
         game.startNewGame();
         menu.setVisible(false);
         menu.setManaged(false);
+
         statusLabel.setText("");
         running = true;
         lastNano = 0;
@@ -198,8 +236,35 @@ public class GameController {
     private void showMenu() {
         menu.setVisible(true);
         menu.setManaged(true);
+        exitDialog.setVisible(false);
+        exitDialog.setManaged(false);
+
         statusLabel.setText("GAME OVER     SCORE " + game.score);
         startButton.requestFocus();
+    }
+
+    private void triggerExitPrompt() {
+        if (!running) return;
+        wasRunningBeforeExit = running;
+        running = false; // Pause gameplay
+        exitDialog.setVisible(true);
+        exitDialog.setManaged(true);
+    }
+
+    @FXML
+    private void onExitYes() {
+        exitDialog.setVisible(false);
+        exitDialog.setManaged(false);
+        showMenu();
+    }
+
+    @FXML
+    private void onExitNo() {
+        exitDialog.setVisible(false);
+        exitDialog.setManaged(false);
+        running = wasRunningBeforeExit; // Resume game
+        lastNano = 0;
+        canvas.requestFocus();
     }
 
     private void onKeyPressed(KeyCode code) {
@@ -232,14 +297,6 @@ public class GameController {
                 break;
             case G:
                 game.showGraph = !game.showGraph;
-                break;
-            case F:
-            case F11:
-                Window window = canvas.getScene().getWindow();
-                if (window instanceof Stage) {
-                    Stage stage = (Stage) window;
-                    stage.setFullScreen(!stage.isFullScreen());
-                }
                 break;
             default:
                 break;
