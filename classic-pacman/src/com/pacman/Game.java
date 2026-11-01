@@ -11,16 +11,35 @@ public class Game {
 
     public enum Mode { SCATTER, CHASE }
 
+    /**
+     * How many ghosts hunt the player.  {@code SOLO} activates a single,
+     * deliberately stronger hunter (Blinky running the minimax brain in pure
+     * chase), {@code ALL} keeps the classic four-ghost roster.
+     */
+    public enum GhostMode { ALL, SOLO }
+
     public final Maze maze = new Maze();
     public final Pacman pacman;
     public final List<Ghost> ghosts = new ArrayList<>();
     public final SoundManager sound = new SoundManager();
 
+    /**
+     * The maze abstracted as a graph - drives all ghost pathfinding.  It is
+     * rebuilt whenever a new level layout is loaded, because each level places
+     * its decision points (nodes) and corridors (edges) differently.
+     */
+    public MazeGraph graph;
+    /** Minimax search tree used by the boss ghost (rebuilt with the graph). */
+    public SearchTree searchTree;
+    /** Hidden cheat-code tokenizer (phase 5). */
+    public final CommandEngine commands = new CommandEngine();
+
+    /** Debug overlay toggle (key G): draws graph nodes, edges and plans. */
+    public boolean showGraph;
+
     public State state = State.TITLE;
     public Mode globalMode = Mode.SCATTER;
-
-    /** Debug overlay toggle (key G): traces each ghost's classic path. */
-    public boolean showGraph;
+    public GhostMode ghostMode = GhostMode.ALL;
 
     public int score;
     public int highScore;
@@ -31,6 +50,13 @@ public class Game {
     public double stateTimer;
     public double frightTimer;
     public int ghostCombo;
+
+    /** Remaining seconds of each active cheat (0 = inactive). */
+    public double cheatSpeedTimer;
+    public double cheatFreezeTimer;
+    public double cheatGodTimer;
+
+    private double pacmanBaseSpeed = 128;
 
     private double modeTimer;
     private int modeIndex;
@@ -45,6 +71,8 @@ public class Game {
 
     public Game() {
         pacman = new Pacman(maze, TILE);
+        graph = new MazeGraph(maze);
+        searchTree = new SearchTree(graph);
         ghosts.add(new Ghost(maze, TILE, Ghost.Kind.BLINKY));
         ghosts.add(new Ghost(maze, TILE, Ghost.Kind.PINKY));
         ghosts.add(new Ghost(maze, TILE, Ghost.Kind.INKY));
@@ -53,7 +81,24 @@ public class Game {
         ghosts.get(1).scatterX = 2;  ghosts.get(1).scatterY = 0;
         ghosts.get(2).scatterX = 27; ghosts.get(2).scatterY = 30;
         ghosts.get(3).scatterX = 0;  ghosts.get(3).scatterY = 30;
+        setGhostMode(GhostMode.ALL);
         resetActors();
+    }
+
+    /**
+     * Turns the requested roster on.  In {@code SOLO} only Blinky stays active
+     * and his brain is swapped to the stronger {@code HUNTER}; the other three
+     * ghosts are parked in the house and skipped by update, collision and draw.
+     */
+    public void setGhostMode(GhostMode mode) {
+        ghostMode = mode;
+        boolean solo = mode == GhostMode.SOLO;
+        for (Ghost g : ghosts) {
+            g.active = !solo || g.kind == Ghost.Kind.BLINKY;
+            if (g.kind == Ghost.Kind.BLINKY) {
+                g.setBrain(solo ? Ghost.Brain.HUNTER : Ghost.Brain.BOSS);
+            }
+        }
     }
 
     private static double center(int i) {
@@ -68,7 +113,8 @@ public class Game {
         score = 0;
         lives = 3;
         level = 1;
-        maze.reset();
+        maze.reset(level);
+        rebuildGraph();
         resetActors();
         state = State.READY;
         stateTimer = 2.2;
@@ -76,15 +122,25 @@ public class Game {
 
     public void nextLevel() {
         level++;
-        maze.reset();
+        maze.reset(level);
+        // Each layout has its own graph shape, so the pathfinding structures
+        // must be rebuilt before the ghosts start reasoning on the new maze.
+        rebuildGraph();
         resetActors();
         state = State.READY;
         stateTimer = 2.0;
     }
 
+    /** Re-derives the maze graph and search tree from the active layout. */
+    private void rebuildGraph() {
+        graph = new MazeGraph(maze);
+        searchTree = new SearchTree(graph);
+    }
+
     private void resetActors() {
         pacman.reset(center(13), center(23));
-        pacman.speed = 128 + Math.min(level - 1, 3) * 2;
+        pacmanBaseSpeed = 128 + Math.min(level - 1, 3) * 2;
+        pacman.speed = pacmanBaseSpeed;
 
         ghosts.get(0).reset(center(13), center(11), Ghost.State.NORMAL, 0);
         ghosts.get(1).reset(center(13), center(14), Ghost.State.HOUSE, 2.0);
@@ -93,7 +149,9 @@ public class Game {
 
         double ghostSpeed = 104 + Math.min(level - 1, 8) * 3;
         for (Ghost g : ghosts) {
-            g.baseSpeed = ghostSpeed;
+            // The solo hunter is a touch faster than the classic pack so it can
+            // actually close a gap; the classic ghosts keep their vanilla pace.
+            g.baseSpeed = (g.brain == Ghost.Brain.HUNTER) ? ghostSpeed * 1.12 : ghostSpeed;
         }
 
         globalMode = Mode.SCATTER;
@@ -101,6 +159,9 @@ public class Game {
         modeTimer = MODE_DURATION[0];
         frightTimer = 0;
         ghostCombo = 0;
+        cheatSpeedTimer = 0;
+        cheatFreezeTimer = 0;
+        cheatGodTimer = 0;
     }
 
     private void die() {
@@ -150,6 +211,52 @@ public class Game {
     }
 
     // ------------------------------------------------------------------
+    // cheat codes (phase 5: trie command engine)
+    // ------------------------------------------------------------------
+
+    /** Feeds one typed character to the trie-based command engine. */
+    public void feedCheat(char ch) {
+        String command = commands.feed(ch);
+        if (command != null) {
+            activateCheat(command);
+        }
+    }
+
+    private void activateCheat(String command) {
+        double seconds;
+        switch (command) {
+            case "bolt":
+                cheatSpeedTimer = 20;
+                seconds = 20;
+                break;
+            case "ice":
+                cheatFreezeTimer = 10;
+                seconds = 6;
+                break;
+            case "hero":
+                cheatGodTimer = 15;
+                seconds = 15;
+                break;
+            default:
+                return;
+        }
+        sound.cheat();
+        System.out.println("[CHEAT] '" + command + "' activated for " + seconds + "s");
+    }
+
+    public boolean ghostsFrozen() {
+        return cheatFreezeTimer > 0;
+    }
+
+    public boolean godMode() {
+        return cheatGodTimer > 0;
+    }
+
+    public boolean speedBoost() {
+        return cheatSpeedTimer > 0;
+    }
+
+    // ------------------------------------------------------------------
     // update
     // ------------------------------------------------------------------
 
@@ -192,6 +299,8 @@ public class Game {
     }
 
     private void updatePlaying(double dt) {
+        tickCheats(dt);
+
         if (frightTimer > 0) {
             frightTimer -= dt;
             if (frightTimer <= 0) {
@@ -212,13 +321,11 @@ public class Game {
         pacman.update(dt);
         eatAtPacman();
 
-        for (Ghost g : ghosts) {
-            g.update(dt, this);
-        }
-
-        if (showGraph) {
+        if (!ghostsFrozen()) {
             for (Ghost g : ghosts) {
-                g.computePlannedPath(this);
+                if (g.active) {
+                    g.update(dt, this);
+                }
             }
         }
 
@@ -231,6 +338,20 @@ public class Game {
         }
     }
 
+    /** Counts down the active cheat timers and applies the speed multiplier. */
+    private void tickCheats(double dt) {
+        if (cheatSpeedTimer > 0) {
+            cheatSpeedTimer = Math.max(0, cheatSpeedTimer - dt);
+        }
+        if (cheatFreezeTimer > 0) {
+            cheatFreezeTimer = Math.max(0, cheatFreezeTimer - dt);
+        }
+        if (cheatGodTimer > 0) {
+            cheatGodTimer = Math.max(0, cheatGodTimer - dt);
+        }
+        pacman.speed = pacmanBaseSpeed * (cheatSpeedTimer > 0 ? 1.75 : 1.0);
+    }
+
     private void eatAtPacman() {
         int e = maze.eat(pacman.tileX(), pacman.tileY());
         if (e == 1) {
@@ -241,13 +362,16 @@ public class Game {
             startFright();
             sound.power();
         }
+        if (e != 0) {
+            maze.maybeCompress();   // phase 6 trigger
+        }
     }
 
     private void startFright() {
         ghostCombo = 0;
         frightTimer = Math.max(2.0, 8.0 - (level - 1) * 0.5);
         for (Ghost g : ghosts) {
-            if (g.state == Ghost.State.NORMAL) {
+            if (g.active && g.state == Ghost.State.NORMAL) {
                 g.state = Ghost.State.FRIGHTENED;
                 g.reverse();
             }
@@ -261,7 +385,7 @@ public class Game {
         globalMode = MODE_KIND[modeIndex];
         modeTimer = MODE_DURATION[modeIndex];
         for (Ghost g : ghosts) {
-            if (g.state == Ghost.State.NORMAL) {
+            if (g.active && g.state == Ghost.State.NORMAL) {
                 g.reverse();
             }
         }
@@ -271,6 +395,9 @@ public class Game {
         double hit = TILE * 0.65;
         double hit2 = hit * hit;
         for (Ghost g : ghosts) {
+            if (!g.active) {
+                continue;
+            }
             if (g.state == Ghost.State.EATEN
                     || g.state == Ghost.State.ENTERING
                     || g.state == Ghost.State.HOUSE) {
@@ -286,8 +413,10 @@ public class Game {
                     score += pts;
                     sound.eatGhost();
                 } else if (g.state == Ghost.State.NORMAL) {
-                    die();
-                    return;
+                    if (!godMode()) {
+                        die();
+                        return;
+                    }
                 }
             }
         }

@@ -19,9 +19,9 @@ public final class CommandEngine {
     private Trie.Node cursor;
 
     public CommandEngine() {
-        trie.insert("speedup");
-        trie.insert("freeze");
-        trie.insert("godmode");
+        trie.insert("bolt");
+        trie.insert("ice");
+        trie.insert("hero");
         reset();
     }
 

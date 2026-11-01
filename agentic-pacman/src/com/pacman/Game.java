@@ -225,17 +225,17 @@ public class Game {
     private void activateCheat(String command) {
         double seconds;
         switch (command) {
-            case "speedup":
-                cheatSpeedTimer = 800000;
-                seconds = 800000;
+            case "bolt":
+                cheatSpeedTimer = 20;
+                seconds = 20;
                 break;
-            case "freeze":
-                cheatFreezeTimer = 6;
+            case "ice":
+                cheatFreezeTimer = 10;
                 seconds = 6;
                 break;
-            case "godmode":
-                cheatGodTimer = 100000;
-                seconds = 100000;
+            case "hero":
+                cheatGodTimer = 15;
+                seconds = 15;
                 break;
             default:
                 return;
