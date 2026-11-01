@@ -8,5 +8,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="agentic-pacman" />
+    <orderEntry type="library" name="lib" level="project" />
   </component>
 </module>

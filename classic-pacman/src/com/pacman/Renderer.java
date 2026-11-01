@@ -38,7 +38,6 @@ public class Renderer {
         drawPacman(gc, game);
         drawGhosts(gc, game);
         drawHud(gc, game);
-        drawCheatTags(gc, game);
         drawOverlay(gc, game);
     }
 
@@ -91,21 +90,6 @@ public class Renderer {
     private void drawPellets(GraphicsContext gc, Game game) {
         boolean powerVisible = ((int) (game.time * 4)) % 2 == 0;
         gc.setFill(PELLET);
-        if (game.maze.isCompressed()) {
-            SparseMatrix s = game.maze.sparse();
-            for (int i = 0; i < s.size(); i++) {
-                double cx = s.col(i) * TILE + TILE / 2.0;
-                double cy = s.row(i) * TILE + TILE / 2.0;
-                if (s.value(i) == SparseMatrix.PELLET) {
-                    gc.fillOval(cx - 2.2, cy - 2.2, 4.4, 4.4);
-                } else {
-                    if (powerVisible) {
-                        gc.fillOval(cx - 5.5, cy - 5.5, 11, 11);
-                    }
-                }
-            }
-            return;
-        }
         for (int r = 0; r < Maze.ROWS; r++) {
             for (int c = 0; c < Maze.COLS; c++) {
                 char ch = game.maze.tileAt(c, r);
@@ -158,9 +142,7 @@ public class Renderer {
 
     private void drawGhosts(GraphicsContext gc, Game game) {
         for (Ghost g : game.ghosts) {
-            if (g.active) {
-                drawGhost(gc, game, g);
-            }
+            drawGhost(gc, game, g);
         }
     }
 
@@ -195,7 +177,6 @@ public class Renderer {
         gc.lineTo(x + r, bottom);
         int segs = 3;
         double segW = (2 * r) / segs;
-
         double bump = r * 0.32;
         for (int i = 0; i < segs; i++) {
             double sx = x + r - i * segW;
@@ -251,109 +232,52 @@ public class Renderer {
     }
 
     // ------------------------------------------------------------------
-    // agentic debug overlay
+    // ghost-path debug overlay (key G)
     // ------------------------------------------------------------------
 
+    /**
+     * Draws, for every ghost, the tile path the classic 1980 greedy AI will
+     * walk next, plus a ring around the tile it is currently targeting.
+     */
     private void drawGraph(GraphicsContext gc, Game game) {
-        MazeGraph g = game.graph;
-
-        gc.setStroke(Color.web("#00E5FF", 0.22));
-        gc.setLineWidth(1.1);
-        for (int u = 0; u < g.nodeCount(); u++) {
-            for (int v : g.neighbors(u)) {
-                if (v > u) {
-                    line(gc, nodeX(g, u), nodeY(g, u), nodeX(g, v), nodeY(g, v));
-                }
-            }
-        }
-
-        for (Ghost gh : game.ghosts) {
-            if (!gh.active) {
-                continue;
-            }
-            List<Integer> path = gh.plannedPath;
-            gc.setStroke(ghostColor(gh.kind));
+        for (Ghost g : game.ghosts) {
+            List<int[]> path = g.plannedPath;
+            Color color = ghostColor(g.kind);
+            gc.setStroke(color);
             gc.setLineWidth(2.4);
-            for (int i = 0; i + 1 < path.size(); i++) {
-                int a = path.get(i);
-                int b = path.get(i + 1);
-                line(gc, nodeX(g, a), nodeY(g, a), nodeX(g, b), nodeY(g, b));
+
+            double prevX = g.x;
+            double prevY = g.y;
+            for (int[] p : path) {
+                double x = p[0] * TILE + TILE / 2.0;
+                double y = p[1] * TILE + TILE / 2.0;
+                gc.strokeLine(prevX, prevY, x, y);
+                prevX = x;
+                prevY = y;
             }
-            if (gh.bossPick >= 0) {
+
+            gc.setFill(color);
+            for (int[] p : path) {
+                double x = p[0] * TILE + TILE / 2.0;
+                double y = p[1] * TILE + TILE / 2.0;
+                gc.fillOval(x - 2.2, y - 2.2, 4.4, 4.4);
+            }
+
+            if (g.targetC >= 0) {
                 gc.setStroke(Color.WHITE);
                 gc.setLineWidth(2);
-                double x = nodeX(g, gh.bossPick);
-                double y = nodeY(g, gh.bossPick);
+                double x = g.targetC * TILE + TILE / 2.0;
+                double y = g.targetR * TILE + TILE / 2.0;
                 gc.strokeOval(x - 6, y - 6, 12, 12);
             }
-            if (gh.interceptNode >= 0) {
-                gc.setStroke(Color.web("#FF00AA"));
-                gc.setLineWidth(2);
-                double x = nodeX(g, gh.interceptNode);
-                double y = nodeY(g, gh.interceptNode);
-                gc.strokeLine(x - 5, y - 5, x + 5, y + 5);
-                gc.strokeLine(x - 5, y + 5, x + 5, y - 5);
-            }
-        }
-
-        gc.setFill(Color.web("#FFFFFF", 0.8));
-        for (int u = 0; u < g.nodeCount(); u++) {
-            gc.fillOval(nodeX(g, u) - 2.2, nodeY(g, u) - 2.2, 4.4, 4.4);
         }
 
         gc.setTextAlign(TextAlignment.LEFT);
         gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 12));
         gc.setFill(Color.web("#00E5FF"));
-        gc.fillText("GRAPH " + g.nodeCount() + " nodes / " + g.edgeCount()
-                + " edges   [G to hide]", 8, 16);
-        gc.setFill(Color.web("#FFD700"));
-        gc.fillText("MEMORY(10): " + arrowHistory(game.pacman), 8, 30);
-    }
-
-    private static String arrowHistory(Pacman p) {
-        if (p.history.isEmpty()) {
-            return "(empty)";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < p.history.size(); i++) {
-            switch (p.history.get(i)) {
-                case UP: sb.append('\u2191'); break;
-                case DOWN: sb.append('\u2193'); break;
-                case LEFT: sb.append('\u2190'); break;
-                case RIGHT: sb.append('\u2192'); break;
-                default: sb.append('.'); break;
-            }
-            sb.append(' ');
-        }
-        return sb.toString();
-    }
-
-    private static double nodeX(MazeGraph g, int node) {
-        return g.col(node) * TILE + TILE / 2.0;
-    }
-
-    private static double nodeY(MazeGraph g, int node) {
-        return g.row(node) * TILE + TILE / 2.0;
-    }
-
-    private void drawCheatTags(GraphicsContext gc, Game game) {
-        StringBuilder sb = new StringBuilder();
-        if (game.speedBoost()) {
-            sb.append("SPEED ");
-        }
-        if (game.ghostsFrozen()) {
-            sb.append("FREEZE ");
-        }
-        if (game.godMode()) {
-            sb.append("GOD ");
-        }
-        if (sb.length() == 0) {
-            return;
-        }
-        gc.setTextAlign(TextAlignment.LEFT);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
-        gc.setFill(Color.web("#8AE234"));
-        gc.fillText("CHEAT " + sb.toString().trim(), 12, BOARD_H + 46);
+        gc.fillText("GHOST PATHS - classic 1980 greedy AI   [G to hide]", 8, 16);
+        gc.setFill(Color.WHITE);
+        gc.fillText("O = target tile", 8, 30);
     }
 
     // ------------------------------------------------------------------
@@ -365,34 +289,23 @@ public class Renderer {
         gc.setFill(Color.web("#05050A"));
         gc.fillRect(0, top, CANVAS_W, HUD);
 
-        // Bottom Status Bar Items in a single evenly-spaced line
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
-
-        // Item 1: SCORE (Left aligned)
         gc.setFill(TEXT);
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 18));
+
         gc.setTextAlign(TextAlignment.LEFT);
-        gc.fillText("SCORE " + game.score, 20, top + 30);
+        gc.fillText("SCORE " + game.score, 12, top + 30);
 
-        // Item 2: SOUND STATUS (Center-Left)
+        gc.setTextAlign(TextAlignment.RIGHT);
+        gc.fillText("LEVEL " + game.level, CANVAS_W - 12, top + 30);
+
         gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
         gc.setFill(game.sound.isEnabled() ? Color.web("#8AE234") : Color.web("#666666"));
-        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", 170, top + 30);
+        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", CANVAS_W / 2, top + 30);
 
-        // Item 3: LEVEL (Center-Right)
-        gc.setFill(TEXT);
-        gc.fillText("LEVEL " + game.level, 320, top + 30);
-
-        // Item 4: Lives icons placed in the right-side exit position
         for (int i = 0; i < game.lives; i++) {
-            drawLifeIcon(gc, 435 + (i * 22), top + 20);
+            drawLifeIcon(gc, 14 + i * 26, top + 10);
         }
-
-        // Sub-label for ghost mode configuration
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 11));
-        gc.setFill(game.ghostMode == Game.GhostMode.SOLO
-                ? Color.web("#FF3B3B") : Color.web("#8890BB"));
-        gc.fillText(game.ghostMode == Game.GhostMode.SOLO ? "SOLO HUNTER" : "CLASSIC x4",
-                CANVAS_W / 2, top + 44);
     }
 
     private void drawLifeIcon(GraphicsContext gc, double x, double y) {
@@ -423,7 +336,7 @@ public class Renderer {
                 gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 16));
                 gc.setFill(Color.WHITE);
                 gc.fillText("ARROWS / WASD  MOVE", cx, cy + 5);
-                gc.fillText("P  PAUSE       M  SOUND", cx, cy + 30);
+                gc.fillText("P  PAUSE    M  SOUND    G  GHOST PATHS", cx, cy + 30);
                 gc.setFill(PAC);
                 gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 18));
                 gc.fillText("PRESS SPACE TO START", cx, cy + 75);
