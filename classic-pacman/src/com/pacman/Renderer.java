@@ -7,8 +7,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 
-import java.util.List;
-
 public class Renderer {
 
     public static final double TILE = Game.TILE;
@@ -32,9 +30,6 @@ public class Renderer {
         drawWalls(gc, game.maze);
         drawDoor(gc, game.maze);
         drawPellets(gc, game);
-        if (game.showGraph) {
-            drawGraph(gc, game);
-        }
         drawPacman(gc, game);
         drawGhosts(gc, game);
         drawHud(gc, game);
@@ -177,6 +172,7 @@ public class Renderer {
         gc.lineTo(x + r, bottom);
         int segs = 3;
         double segW = (2 * r) / segs;
+
         double bump = r * 0.32;
         for (int i = 0; i < segs; i++) {
             double sx = x + r - i * segW;
@@ -203,7 +199,7 @@ public class Renderer {
 
             double px = ex + g.dir.dx * r * 0.12;
             double py = ey + g.dir.dy * r * 0.12;
-            gc.setFill(frightened ? Color.web("#2121DE") : Color.web("#2121DE"));
+            gc.setFill(Color.web("#2121DE"));
             gc.fillOval(px - pupilR, py - pupilR, pupilR * 2, pupilR * 2);
         }
 
@@ -232,55 +228,6 @@ public class Renderer {
     }
 
     // ------------------------------------------------------------------
-    // ghost-path debug overlay (key G)
-    // ------------------------------------------------------------------
-
-    /**
-     * Draws, for every ghost, the tile path the classic 1980 greedy AI will
-     * walk next, plus a ring around the tile it is currently targeting.
-     */
-    private void drawGraph(GraphicsContext gc, Game game) {
-        for (Ghost g : game.ghosts) {
-            List<int[]> path = g.plannedPath;
-            Color color = ghostColor(g.kind);
-            gc.setStroke(color);
-            gc.setLineWidth(2.4);
-
-            double prevX = g.x;
-            double prevY = g.y;
-            for (int[] p : path) {
-                double x = p[0] * TILE + TILE / 2.0;
-                double y = p[1] * TILE + TILE / 2.0;
-                gc.strokeLine(prevX, prevY, x, y);
-                prevX = x;
-                prevY = y;
-            }
-
-            gc.setFill(color);
-            for (int[] p : path) {
-                double x = p[0] * TILE + TILE / 2.0;
-                double y = p[1] * TILE + TILE / 2.0;
-                gc.fillOval(x - 2.2, y - 2.2, 4.4, 4.4);
-            }
-
-            if (g.targetC >= 0) {
-                gc.setStroke(Color.WHITE);
-                gc.setLineWidth(2);
-                double x = g.targetC * TILE + TILE / 2.0;
-                double y = g.targetR * TILE + TILE / 2.0;
-                gc.strokeOval(x - 6, y - 6, 12, 12);
-            }
-        }
-
-        gc.setTextAlign(TextAlignment.LEFT);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 12));
-        gc.setFill(Color.web("#00E5FF"));
-        gc.fillText("GHOST PATHS - classic 1980 greedy AI   [G to hide]", 8, 16);
-        gc.setFill(Color.WHITE);
-        gc.fillText("O = target tile", 8, 30);
-    }
-
-    // ------------------------------------------------------------------
     // hud + overlays
     // ------------------------------------------------------------------
 
@@ -289,23 +236,31 @@ public class Renderer {
         gc.setFill(Color.web("#05050A"));
         gc.fillRect(0, top, CANVAS_W, HUD);
 
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
+
+        // Score
         gc.setFill(TEXT);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 18));
-
         gc.setTextAlign(TextAlignment.LEFT);
-        gc.fillText("SCORE " + game.score, 12, top + 30);
+        gc.fillText("SCORE " + game.score, 20, top + 30);
 
-        gc.setTextAlign(TextAlignment.RIGHT);
-        gc.fillText("LEVEL " + game.level, CANVAS_W - 12, top + 30);
-
+        // Sound Status
         gc.setTextAlign(TextAlignment.CENTER);
-        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
         gc.setFill(game.sound.isEnabled() ? Color.web("#8AE234") : Color.web("#666666"));
-        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", CANVAS_W / 2, top + 30);
+        gc.fillText(game.sound.isEnabled() ? "SOUND ON" : "MUTED", 170, top + 30);
 
+        // Level
+        gc.setFill(TEXT);
+        gc.fillText("LEVEL " + game.level, 320, top + 30);
+
+        // Lives
         for (int i = 0; i < game.lives; i++) {
-            drawLifeIcon(gc, 14 + i * 26, top + 10);
+            drawLifeIcon(gc, 435 + (i * 22), top + 20);
         }
+
+        // Sub-label for Classic mode
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 11));
+        gc.setFill(Color.web("#8890BB"));
+        gc.fillText("CLASSIC ARCADE", CANVAS_W / 2, top + 44);
     }
 
     private void drawLifeIcon(GraphicsContext gc, double x, double y) {
@@ -336,7 +291,7 @@ public class Renderer {
                 gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 16));
                 gc.setFill(Color.WHITE);
                 gc.fillText("ARROWS / WASD  MOVE", cx, cy + 5);
-                gc.fillText("P  PAUSE    M  SOUND    G  GHOST PATHS", cx, cy + 30);
+                gc.fillText("P  PAUSE       M  SOUND", cx, cy + 30);
                 gc.setFill(PAC);
                 gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 18));
                 gc.fillText("PRESS SPACE TO START", cx, cy + 75);

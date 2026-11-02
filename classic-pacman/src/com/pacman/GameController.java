@@ -8,7 +8,6 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.control.RadioButton;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
@@ -36,8 +35,6 @@ public class GameController {
     @FXML private Label percentageLabel;
     @FXML private ProgressBar loadingProgressBar;
 
-    @FXML private RadioButton soloGhost;
-    @FXML private RadioButton allGhosts;
     @FXML private Button startButton;
     @FXML private Label statusLabel;
 
@@ -113,10 +110,6 @@ public class GameController {
             }
 
             onKeyPressed(e.getCode());
-            String text = e.getText();
-            if (text != null && text.length() == 1) {
-                game.feedCheat(text.charAt(0));
-            }
         });
     }
 
@@ -220,9 +213,6 @@ public class GameController {
 
     @FXML
     private void onStart() {
-        game.setGhostMode(soloGhost.isSelected()
-                ? Game.GhostMode.SOLO
-                : Game.GhostMode.ALL);
         game.startNewGame();
         menu.setVisible(false);
         menu.setManaged(false);
@@ -294,9 +284,6 @@ public class GameController {
                 break;
             case M:
                 game.toggleMute();
-                break;
-            case G:
-                game.showGraph = !game.showGraph;
                 break;
             default:
                 break;
