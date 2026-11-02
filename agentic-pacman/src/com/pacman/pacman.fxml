@@ -68,10 +68,6 @@
                                textFill="#AAAAAA">
                             <font><Font name="Monospaced" size="12.0"/></font>
                         </Label>
-
-                        <Label text="secret codes:  bolt   ice   hero" textFill="#666666">
-                            <font><Font name="Monospaced" size="11.0"/></font>
-                        </Label>
                     </children>
                 </VBox>
 
